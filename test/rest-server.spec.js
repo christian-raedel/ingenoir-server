@@ -66,12 +66,15 @@ describe('RestServer:Plugins', function() {
 });
 
 describe('RestServer:User', function() {
-    var server = null, client = null;
+    var server = null, client = null
+        , baseurl = '/api/v2/user';
 
     before(function(done) {
         server = new RestServer();
         server.startup().then(function(server) {
             server.use(restify.authorizationParser());
+            server.use(restify.queryParser());
+            server.use(restify.bodyParser());
             server.loadApi();
             done();
         })
@@ -92,8 +95,8 @@ describe('RestServer:User', function() {
     });
 
     it('should signup a user', function(done) {
-        client.post('/api/v2/user/signup', function(err, req, res, user) {
-            logger.debug('signed up user: [%j]', user);
+        client.post(baseurl.concat('/signup'), function(err, req, res, user) {
+            logger.debug('signed up user: %j', user);
             expect(user['_id']).to.be.ok;
             expect(user.username).to.be.equal('$inge');
             expect(user.password).to.be.equal('$noir');
@@ -102,10 +105,10 @@ describe('RestServer:User', function() {
         });
     });
 
-    it('should set isAuthenticated flag', function(done) {
-        client.get('/api/v2/user/authenticated', function(err, req, res, isAuthenticated) {
-            logger.debug('isAuthenticated: [%j]', isAuthenticated);
-            expect(isAuthenticated).to.be.true;
+    it('should set authenticated user', function(done) {
+        client.get(baseurl.concat('/authenticated'), function(err, req, res, authorization) {
+            logger.debug('authorization: %j', authorization);
+            expect(authorization.user.username).to.be.equal('$inge');
             done();
         });
     });
@@ -124,4 +127,26 @@ describe('RestServer:User', function() {
         });
     });
     */
+
+    it('should update an existing user', function(done) {
+        client.get(baseurl.concat('/authenticated'), function(err, req, res, authorization) {
+            client.post(baseurl.concat('/update'), {
+                user: {
+                    '_id': authorization.user['_id'],
+                    username: '$rest',
+                    password: '$hope',
+                    bio: 'Some appraisals...'
+                }
+            }, function(err, req, res, user) {
+                expect(err).to.be.not.ok;
+                expect(user).to.be.ok;
+                expect(user['_id']).to.be.ok;
+                expect(user.username).to.be.equal('$rest');
+                expect(user.password).to.be.equal('$hope');
+                expect(user.bio).to.match(/appraisals/);
+                expect(user.lastLogin).to.be.above(0);
+                done();
+            });
+        });
+    });
 });
